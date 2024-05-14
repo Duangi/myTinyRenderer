@@ -9,7 +9,7 @@ int main(int argc, char** argv){
     TGAImage image(100, 100, TGAImage::RGB);
     line(13, 20, 80, 40, image, white); 
     line(20, 13, 40, 80, image, red); 
-    // line(80, 40, 13, 20, image, red);
+    line(80, 40, 13, 20, image, red);
     image.write_tga_file(
         "output.tga"
     );
@@ -27,21 +27,24 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
         std::swap(x0, x1);
         std::swap(y0, y1);
     }
-    
-    float k = (y1 - y0) / (float)(x1 - x0);
-    float b = y0 - k * x0;
-    float y = y0;
-    float  error = 0;
+    // 尽量避免一切的浮点运算
+    int dx = x1 - x0;
+    int dy = y1 - y0;
+    // k2 = k*dx*2
+    int k2 = std::abs(dy) * 2;
+    int error2 = 0;
+    int y = y0;
     for(int x=x0; x<=x1;x += 1){
         if(steep){
             image.set(y,x,color);
         }else{
             image.set(x,y,color);
         }
-        error += k; 
-        if (error>.5) { 
+        // 通过
+        error2 += k2; 
+        if (error2 > dx) { 
             y += (y1>y0?1:-1); 
-            error -= 1.; 
+            error2 -= dx * 2; 
         } 
     }
 }
