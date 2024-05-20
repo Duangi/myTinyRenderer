@@ -3,12 +3,14 @@
 #include "tgaimage.h"
 #include "geometry.h"
 #include <algorithm>
+#include "model.h"
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red   = TGAColor(255, 0,   0,   255);
 const TGAColor green = TGAColor(0,   255, 0,   255);
-const int width  = 200;
-const int height = 200;
+Model *model = NULL;
+const int width  = 800;
+const int height = 800;
 
 void line(Vec2i p0, Vec2i p1, TGAImage &image, TGAColor color) {
     bool steep = false;
@@ -80,10 +82,22 @@ void triangle(Vec2i *pts, TGAImage &image, TGAColor color) {
 }
 
 int main(int argc, char** argv) {
-    TGAImage frame(200, 200, TGAImage::RGB); 
-    Vec2i pts[3] = {Vec2i(10,10), Vec2i(100, 30), Vec2i(190, 160)}; 
-    triangle(pts, frame, red); 
-    frame.flip_vertically(); // to place the origin in the bottom left corner of the image 
+    TGAImage frame(width, height, TGAImage::RGB); 
+    if (2==argc) {
+        model = new Model(argv[1]);
+    } else {
+        model = new Model("obj/african_head.obj");
+    }
+    for (int i=0; i<model->nfaces(); i++) { 
+        std::vector<int> face = model->face(i); 
+        Vec2i screen_coords[3]; 
+        for (int j=0; j<3; j++) { 
+            Vec3f world_coords = model->vert(face[j]); 
+            screen_coords[j] = Vec2i((world_coords.x+1.)*width/2., (world_coords.y+1.)*height/2.); 
+        } 
+        triangle(screen_coords, frame, TGAColor(rand()%255, rand()%255, rand()%255, 255)); 
+    }
+    frame.flip_vertically();
     frame.write_tga_file("framebuffer.tga");
     return 0; 
 }
