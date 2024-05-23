@@ -59,9 +59,9 @@ bool isInsideTriangle(Vec2i *tri, Vec2i P){
     Vec2i BP = P - B;
     Vec2i CP = P - C;
 
-    float cross1 = cross(AB,AP);
-    float cross2 = cross(BC,BP);
-    float cross3 = cross(CA,CP);
+    float cross1 = cross(AB, AP);
+    float cross2 = cross(BC, BP);
+    float cross3 = cross(CA, CP);
 
     return (cross1 >= 0 && cross2 >=0 && cross3 >= 0) || (cross1 <= 0 && cross2 <= 0 && cross3 <= 0);
 }
@@ -78,7 +78,8 @@ Vec3f barycentric(Vec3f A, Vec3f B, Vec3f C, Vec3f P) {
         return Vec3f(1.f-(u.x+u.y)/u.z, u.y/u.z, u.x/u.z);
     return Vec3f(-1,1,1); // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
-void triangle(Vec3f *pts,float *zbuffer, TGAImage &image, TGAColor color) {  
+
+void triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAColor color) {  
     Vec2f bboxmin(image.get_width()-1,  image.get_height()-1); 
     Vec2f bboxmax(0, 0); 
     Vec2f clamp(image.get_width()-1, image.get_height()-1); 
@@ -117,7 +118,7 @@ int main(int argc, char** argv) {
     }
     Vec3f light_dir(0,0,-1);
     float *zbuffer = new float[width*height];
-    for(int i = width*height;i--;zbuffer[i] = -std::numeric_limits<float>::max());
+    for(int i = width*height; i--; zbuffer[i] = -std::numeric_limits<float>::max());
     
     for (int i=0; i<model->nfaces(); i++) {
         std::vector<int> face = model->face(i);
@@ -129,14 +130,17 @@ int main(int argc, char** argv) {
             world_coords[j]  = v; 
         } 
         // 
-        Vec3f n = cross(world_coords[2]-world_coords[1],world_coords[1] - world_coords[0]); 
+        Vec3f n = cross(world_coords[2]-world_coords[1], world_coords[1]-world_coords[0]); 
         n.normalize(); 
         float intensity = n*light_dir; 
         Vec3f pts[3];
         for (int i=0; i<3; i++) pts[i] = world2screen(model->vert(face[i]));
-        triangle(pts, zbuffer, frame, TGAColor(intensity*255, intensity*255, intensity*255, 255));
+        // 背面剔除
+        if(intensity > 0 )
+            triangle(pts, zbuffer, frame, TGAColor(intensity*255, intensity*255, intensity*255, 255));
     }
     frame.flip_vertically();
     frame.write_tga_file("framebuffer.tga");
+    delete[] zbuffer;
     return 0; 
 }
