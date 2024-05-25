@@ -6,6 +6,7 @@
 #include "model.h"
 #include "geometry.h"
 #include <algorithm>
+#include <iostream>
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red   = TGAColor(255, 0,   0,   255);
@@ -79,7 +80,8 @@ Vec3f barycentric(Vec3f A, Vec3f B, Vec3f C, Vec3f P) {
     return Vec3f(-1,1,1); // in this case generate negative coordinates, it will be thrown away by the rasterizator
 }
 
-void triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAColor color) {  
+void triangle(Vec3f *pts, Vec2f* tex, float *zbuffer, TGAImage &image, TGAImage &texture) {  
+    
     Vec2f bboxmin(image.get_width()-1,  image.get_height()-1); 
     Vec2f bboxmax(0, 0); 
     Vec2f clamp(image.get_width()-1, image.get_height()-1); 
@@ -96,10 +98,16 @@ void triangle(Vec3f *pts, float *zbuffer, TGAImage &image, TGAColor color) {
             Vec3f bc_screen  = barycentric(pts[0], pts[1], pts[2], P);
             if (bc_screen.x<0 || bc_screen.y<0 || bc_screen.z<0) continue;
             P.z = 0;
-            for (int i=0; i<3; i++) P.z += pts[i][2]*bc_screen[i];
+            Vec2f uv(0,0);
+            for (int i=0; i<3; i++){
+                P.z += pts[i][2]*bc_screen[i];
+                uv = uv + tex[i] * bc_screen[i];
+            } 
             if (zbuffer[int(P.x+P.y*width)]<P.z) {
                 zbuffer[int(P.x+P.y*width)] = P.z;
+                TGAColor color = texture.get(uv.x * texture.get_width(), uv.y * texture.get_height());
                 image.set(P.x, P.y, color);
+                // image.set(P.x, P.y, color);
             }
         } 
     } 
@@ -116,29 +124,44 @@ int main(int argc, char** argv) {
     } else {
         model = new Model("obj/african_head.obj");
     }
+
+    TGAImage texture;
+    if(!texture.read_tga_file("obj/african_head_diffuse.tga")){
+        // std:cerr << "Error loading texture file" << std::endl;
+        return -1;
+    }
+    // texture.flip_vertically();
     Vec3f light_dir(0,0,-1);
     float *zbuffer = new float[width*height];
     for(int i = width*height; i--; zbuffer[i] = -std::numeric_limits<float>::max());
     
     for (int i=0; i<model->nfaces(); i++) {
+        
         std::vector<int> face = model->face(i);
+        std::vector<int> tex_face = model->tex_face(i);
         Vec2i screen_coords[3]; 
         Vec3f world_coords[3]; 
+        Vec2f tex_coords[3];
+        Vec3f pts[3];
         for (int j=0; j<3; j++) { 
             Vec3f v = model->vert(face[j]); 
             screen_coords[j] = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.); 
-            world_coords[j]  = v; 
+            world_coords[j]  = v;
+            pts[j] = world2screen(model->vert(face[j]));
+            tex_coords[j] = model -> tex_coord(tex_face[j]);
         } 
         // 
         Vec3f n = cross(world_coords[2]-world_coords[1], world_coords[1]-world_coords[0]); 
         n.normalize(); 
         float intensity = n*light_dir; 
-        Vec3f pts[3];
-        for (int i=0; i<3; i++) pts[i] = world2screen(model->vert(face[i]));
+
         // 背面剔除
-        if(intensity > 0 )
-            triangle(pts, zbuffer, frame, TGAColor(intensity*255, intensity*255, intensity*255, 255));
+        if(intensity > 0 ) triangle(pts,tex_coords, zbuffer, frame, texture);
     }
+
+    
+
+
     frame.flip_vertically();
     frame.write_tga_file("framebuffer.tga");
     delete[] zbuffer;
